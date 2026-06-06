@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-8 border border-gray-200">
+    <h1 class="text-2xl font-bold mb-6 text-gray-800">Scraper Configuration</h1>
+
+    <form method="POST">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="col-span-full">
+                <label for="name" class="block text-gray-700 font-bold mb-2">Scraper Name</label>
+                <input type="text" id="name" name="name" value="{{ config.name if config else '' }}" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="col-span-full">
+                <label for="url" class="block text-gray-700 font-bold mb-2">Target URL</label>
+                <input type="url" id="url" name="url" value="{{ config.url if config else '' }}" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://example.com">
+            </div>
+
+            <div>
+                <label for="pagination_selector" class="block text-gray-700 font-bold mb-2">Pagination Selector (CSS)</label>
+                <input type="text" id="pagination_selector" name="pagination_selector" value="{{ config.pagination_selector if config else '' }}" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="a.next-page">
+            </div>
+
+            <div>
+                <label for="max_pages" class="block text-gray-700 font-bold mb-2">Max Pages</label>
+                <input type="number" id="max_pages" name="max_pages" value="{{ config.max_pages if config else 1 }}" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="flex items-center">
+                <input type="checkbox" name="follow_links" id="follow_links" {{ 'checked' if config and config.follow_links else '' }} class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                <label for="follow_links" class="ml-3 block text-gray-700 font-bold">Follow Links within domain</label>
+            </div>
+
+            <div>
+                <label for="link_selector" class="block text-gray-700 font-bold mb-2">Link Selector (CSS)</label>
+                <input type="text" id="link_selector" name="link_selector" value="{{ config.link_selector if config else '' }}" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="article a">
+            </div>
+
+            <div>
+                <label for="schedule_interval" class="block text-gray-700 font-bold mb-2">Schedule (Interval in minutes)</label>
+                <input type="number" id="schedule_interval" name="schedule_interval" value="{{ config.schedule_interval if config and config.schedule_interval else '' }}" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 60 for hourly">
+                <p class="text-xs text-gray-500 mt-1">Leave blank for manual run only.</p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Fields to Extract</h2>
+            <div id="fields-container" class="space-y-4">
+                {% if config %}
+                    {% for field in config.fields %}
+                    <div class="field-row bg-gray-50 p-4 rounded-lg border border-gray-200 relative">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Field Name</label>
+                                <input type="text" name="field_name[]" value="{{ field.name }}" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CSS Selector</label>
+                                <input type="text" name="field_selector[]" value="{{ field.selector }}" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
+                                <select name="field_type[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <option value="text" {{ 'selected' if field.field_type == 'text' else '' }}>Text Content</option>
+                                    <option value="attr" {{ 'selected' if field.field_type == 'attr' else '' }}>Attribute Value</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Attribute Name</label>
+                                <input type="text" name="field_attr[]" value="{{ field.attr_name if field.attr_name else '' }}" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g., src, href">
+                            </div>
+                        </div>
+                        <button type="button" onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700">&times;</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="field-row bg-gray-50 p-4 rounded-lg border border-gray-200 relative">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label for="field_name_0" class="block text-xs font-bold text-gray-500 uppercase mb-1">Field Name</label>
+                            <input type="text" id="field_name_0" name="field_name[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g., Title">
+                        </div>
+                        <div>
+                            <label for="field_selector_0" class="block text-xs font-bold text-gray-500 uppercase mb-1">CSS Selector</label>
+                            <input type="text" id="field_selector_0" name="field_selector[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="h1.title">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
+                            <select name="field_type[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="text">Text Content</option>
+                                <option value="attr">Attribute Value</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Attribute Name</label>
+                            <input type="text" name="field_attr[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g., src, href">
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <button type="button" onclick="addField()" class="mt-4 text-blue-600 font-bold text-sm">+ Add Another Field</button>
+        </div>
+
+        <div class="flex justify-end gap-4 border-t pt-6">
+            <a href="/" class="px-6 py-2 border rounded-lg font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Save Configuration</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function addField() {
+        const container = document.getElementById('fields-container');
+        const count = container.querySelectorAll('.field-row').length;
+        const newField = document.createElement('div');
+        newField.className = 'field-row bg-gray-50 p-4 rounded-lg border border-gray-200 relative mt-4';
+        newField.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="field_name_${count}" class="block text-xs font-bold text-gray-500 uppercase mb-1">Field Name</label>
+                    <input type="text" id="field_name_${count}" name="field_name[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="field_selector_${count}" class="block text-xs font-bold text-gray-500 uppercase mb-1">CSS Selector</label>
+                    <input type="text" id="field_selector_${count}" name="field_selector[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
+                    <select name="field_type[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="text">Text Content</option>
+                        <option value="attr">Attribute Value</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Attribute Name</label>
+                    <input type="text" name="field_attr[]" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700">&times;</button>
+        `;
+        container.appendChild(newField);
+    }
+</script>
+{% endblock %}
