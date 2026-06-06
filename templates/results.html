@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Results for: {{ config.name }}</h1>
+        <p class="text-gray-600 truncate">{{ config.url }}</p>
+    </div>
+    <div class="flex gap-4">
+        <a href="/" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-300">Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Page URL</th>
+                    {% for field in config.fields %}
+                    <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">{{ field.name }}</th>
+                    {% endfor %}
+                    <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Scraped At</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for result in results %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-blue-600 truncate max-w-xs">
+                        <a href="{{ result.page_url }}" target="_blank">{{ result.page_url }}</a>
+                    </td>
+                    {% for field in config.fields %}
+                    <td class="px-6 py-4 text-sm text-gray-700">
+                        {{ result.data.get(field.name, 'N/A') }}
+                    </td>
+                    {% endfor %}
+                    <td class="px-6 py-4 text-sm text-gray-500 text-right">
+                        {{ result.scraped_at.strftime('%Y-%m-%d %H:%M') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ config.fields|length + 2 }}" class="px-6 py-12 text-center text-gray-500">
+                        No results found for this scraper. Run it to see data!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
