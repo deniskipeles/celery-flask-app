@@ -1,11 +1,11 @@
 import os
-import requests
 from bs4 import BeautifulSoup
 from celery import Celery
 from celery.utils.log import get_task_logger
 from models import db, ScraperConfig, ScraperField, ScrapedData
 from flask import Flask
 from urllib.parse import urljoin, urlparse
+from camoufox.sync_api import Camoufox
 
 def create_app():
     app = Flask(__name__)
@@ -22,13 +22,13 @@ flask_app = create_app()
 celery_app = Celery('tasks', broker=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"))
 logger = get_task_logger(__name__)
 
-def scrape_page(url, fields):
+def scrape_page(browser, url, fields):
     try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        page = browser.new_page()
+        page.goto(url, wait_until="networkidle", timeout=30000)
+        content = page.content()
+        soup = BeautifulSoup(content, 'html.parser')
 
-        results = []
         extracted_data = {}
         for field in fields:
             elements = soup.select(field.selector)
@@ -36,6 +36,8 @@ def scrape_page(url, fields):
                 extracted_data[field.name] = [el.get_text(strip=True) for el in elements]
             elif field.field_type == 'attr' and field.attr_name:
                 extracted_data[field.name] = [el.get(field.attr_name) for el in elements if el.has_attr(field.attr_name)]
+
+        page.close()
 
         if not extracted_data:
             return [], soup
@@ -53,7 +55,7 @@ def scrape_page(url, fields):
 
         return final_results, soup
     except Exception as e:
-        logger.error(f"Error scraping {url}: {e}")
+        logger.error(f"Error scraping {url} with Camoufox: {e}")
         return [], None
 
 @celery_app.task
@@ -71,41 +73,42 @@ def run_scraper(config_id):
 
         base_domain = urlparse(config.url).netloc
 
-        while urls_to_visit and pages_scraped < config.max_pages:
-            current_url = urls_to_visit.pop(0)
-            if current_url in visited_urls:
-                continue
+        with Camoufox(headless=True) as browser:
+            while urls_to_visit and pages_scraped < config.max_pages:
+                current_url = urls_to_visit.pop(0)
+                if current_url in visited_urls:
+                    continue
 
-            logger.info(f"Scraping page: {current_url}")
-            results, soup = scrape_page(current_url, config.fields)
+                logger.info(f"Scraping page: {current_url}")
+                results, soup = scrape_page(browser, current_url, config.fields)
 
-            if results:
-                for item in results:
-                    data_entry = ScrapedData(config_id=config.id, data=item, page_url=current_url)
-                    db.session.add(data_entry)
-                db.session.commit()
+                if results:
+                    for item in results:
+                        data_entry = ScrapedData(config_id=config.id, data=item, page_url=current_url)
+                        db.session.add(data_entry)
+                    db.session.commit()
 
-            visited_urls.add(current_url)
-            pages_scraped += 1
+                visited_urls.add(current_url)
+                pages_scraped += 1
 
-            if soup:
-                if config.pagination_selector:
-                    next_page_el = soup.select_one(config.pagination_selector)
-                    if next_page_el:
-                        next_page_url = next_page_el.get('href')
-                        if next_page_url:
-                            full_url = urljoin(current_url, next_page_url)
-                            if full_url not in visited_urls:
-                                urls_to_visit.append(full_url)
+                if soup:
+                    if config.pagination_selector:
+                        next_page_el = soup.select_one(config.pagination_selector)
+                        if next_page_el:
+                            next_page_url = next_page_el.get('href')
+                            if next_page_url:
+                                full_url = urljoin(current_url, next_page_url)
+                                if full_url not in visited_urls:
+                                    urls_to_visit.append(full_url)
 
-                if config.follow_links and config.link_selector:
-                    link_elements = soup.select(config.link_selector)
-                    for el in link_elements:
-                        link_url = el.get('href')
-                        if link_url:
-                            full_url = urljoin(current_url, link_url)
-                            if urlparse(full_url).netloc == base_domain and full_url not in visited_urls:
-                                urls_to_visit.append(full_url)
+                    if config.follow_links and config.link_selector:
+                        link_elements = soup.select(config.link_selector)
+                        for el in link_elements:
+                            link_url = el.get('href')
+                            if link_url:
+                                full_url = urljoin(current_url, link_url)
+                                if urlparse(full_url).netloc == base_domain and full_url not in visited_urls:
+                                    urls_to_visit.append(full_url)
 
         from datetime import datetime
         config.last_run = datetime.utcnow()
